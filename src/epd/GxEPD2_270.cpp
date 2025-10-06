@@ -12,8 +12,8 @@
 
 #include "GxEPD2_270.h"
 
-GxEPD2_270::GxEPD2_270(int8_t cs, int8_t dc, int8_t rst, int8_t busy) :
-  GxEPD2_EPD(cs, dc, rst, busy, LOW, 10000000, WIDTH, HEIGHT, panel, hasColor, hasPartialUpdate, hasFastPartialUpdate)
+GxEPD2_270::GxEPD2_270(int8_t cs, int8_t dc, int8_t rst, int8_t busy, SPIClass &spi) : // 添加新成员, 适配我目前的代码
+  GxEPD2_EPD(cs, dc, rst, busy, LOW, 10000000, WIDTH, HEIGHT, panel, hasColor, hasPartialUpdate, hasFastPartialUpdate, spi)
 {
 }
 
