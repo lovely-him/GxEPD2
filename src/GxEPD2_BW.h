@@ -261,6 +261,16 @@ class GxEPD2_BW : public GxEPD2_GFX_BASE_CLASS
       epd2.powerOff();
     }
 
+    // Transplanted from nextPage(), non-paged, fast (partial) refresh
+    // Runs after the physical refresh is complete (BUSY released).
+    // Unlike endAsyncFull(), no powerOff() here — the firmware calls endUpdate()/hibernate() itself.
+    void endAsyncPartial() {
+      if (epd2.hasFastPartialUpdate) {
+        uint32_t offset = _reverse ? (HEIGHT - _pw_h) * _pw_w / 8 : 0;
+        epd2.writeImageAgain(_buffer + offset, _pw_x, _pw_y, _pw_w, _pw_h);
+      }
+    }
+
     bool nextPage()
     {
       if (1 == _pages)
@@ -270,11 +280,13 @@ class GxEPD2_BW : public GxEPD2_GFX_BASE_CLASS
           uint32_t offset = _reverse ? (HEIGHT - _pw_h) * _pw_w / 8 : 0;
           epd2.writeImage(_buffer + offset, _pw_x, _pw_y, _pw_w, _pw_h);
           epd2.refresh(_pw_x, _pw_y, _pw_w, _pw_h);
+#if !defined(USE_EINK_DYNAMICDISPLAY)
           if (epd2.hasFastPartialUpdate)
           {
             epd2.writeImageAgain(_buffer + offset, _pw_x, _pw_y, _pw_w, _pw_h);
             //epd2.refresh(_pw_x, _pw_y, _pw_w, _pw_h); // not needed
           }
+#endif
         }
         else // full update
         {

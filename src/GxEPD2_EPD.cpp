@@ -16,6 +16,7 @@
 #else
 #include <avr/pgmspace.h>
 #endif
+#include <string.h> // memset
 
 GxEPD2_EPD::GxEPD2_EPD(int8_t cs, int8_t dc, int8_t rst, int8_t busy, int8_t busy_level, uint32_t busy_timeout,
                        uint16_t w, uint16_t h, GxEPD2::Panel p, bool c, bool pu, bool fpu, SPIClass &spi) :
@@ -98,9 +99,9 @@ void GxEPD2_EPD::_reset()
 
 void GxEPD2_EPD::_waitWhileBusy(const char* comment, uint16_t busy_time)
 {
-  // For full refreshes, meshtastic/firmare will poll GxEPD2_EPD::isBusy() instead of waiting here (for EInkDynamicDisplay only)
+  // For full/fast refreshes, meshtastic/firmware will poll GxEPD2_EPD::isBusy() instead of waiting here (for EInkDynamicDisplay only)
 #if defined(USE_EINK_DYNAMICDISPLAY)
-  if (_isUpdatingFull(comment))
+  if (_isAsyncRefresh(comment))
     return;
 #endif
 
@@ -159,9 +160,36 @@ void GxEPD2_EPD::_writeData(const uint8_t* data, uint16_t n)
 {
   _spi.beginTransaction(_spi_settings);
   if (_cs >= 0) digitalWrite(_cs, LOW);
+#if defined(NRF52_SERIES) || defined(NRF52)
+  _spi.transfer(data, NULL, n); // TX-only block transfer (single EasyDMA burst); source buffer untouched
+#else
   for (uint16_t i = 0; i < n; i++)
   {
     _spi.transfer(*data++);
+  }
+#endif
+  if (_cs >= 0) digitalWrite(_cs, HIGH);
+  _spi.endTransaction();
+}
+
+void GxEPD2_EPD::_writeDataRepeated(uint8_t value, uint16_t n)
+{
+  _spi.beginTransaction(_spi_settings);
+  if (_cs >= 0) digitalWrite(_cs, LOW);
+  uint8_t chunk[128];
+  memset(chunk, value, sizeof(chunk));
+  while (n > 0)
+  {
+    uint16_t c = (n > sizeof(chunk)) ? sizeof(chunk) : n;
+#if defined(NRF52_SERIES) || defined(NRF52)
+    _spi.transfer(chunk, NULL, c); // TX-only block transfer
+#else
+    for (uint16_t i = 0; i < c; i++)
+    {
+      _spi.transfer(chunk[i]);
+    }
+#endif
+    n -= c;
   }
   if (_cs >= 0) digitalWrite(_cs, HIGH);
   _spi.endTransaction();
@@ -256,7 +284,7 @@ bool GxEPD2_EPD::isBusy() {
 }
 
 // Used to skip _waitWhileBusy(), for meshtastic async
-bool GxEPD2_EPD::_isUpdatingFull(const char* comment) {
-  // True if comment matches
-  return ( strcmp(comment, "_Update_Full") == 0 );
+bool GxEPD2_EPD::_isAsyncRefresh(const char* comment) {
+  // True if comment matches (full + fast refresh are both awaited asynchronously by firmware)
+  return ( strcmp(comment, "_Update_Full") == 0 || strcmp(comment, "_Update_Part") == 0 );
 }

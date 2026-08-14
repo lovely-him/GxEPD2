@@ -42,10 +42,7 @@ void GxEPD2_213_B74::writeScreenBufferAgain(uint8_t value)
 void GxEPD2_213_B74::_writeScreenBuffer(uint8_t command, uint8_t value)
 {
   _writeCommand(command);
-  for (uint32_t i = 0; i < uint32_t(WIDTH) * uint32_t(HEIGHT) / 8; i++)
-  {
-    _writeData(value);
-  }
+  _writeDataRepeated(value, uint32_t(WIDTH) * uint32_t(HEIGHT) / 8);
 }
 
 void GxEPD2_213_B74::writeImage(const uint8_t bitmap[], int16_t x, int16_t y, int16_t w, int16_t h, bool invert, bool mirror_y, bool pgm)
@@ -84,9 +81,11 @@ void GxEPD2_213_B74::_writeImage(uint8_t command, const uint8_t bitmap[], int16_
   if (!_using_partial_mode) _Init_Part();
   _setPartialRamArea(x1, y1, w1, h1);
   _writeCommand(command);
+  const int16_t wb_win = w1 / 8; // bytes per window row
+  uint8_t row[256];              // stack buffer: large enough for the widest supported panel row
   for (int16_t i = 0; i < h1; i++)
   {
-    for (int16_t j = 0; j < w1 / 8; j++)
+    for (int16_t j = 0; j < wb_win; j++)
     {
       uint8_t data;
       // use wb, h of bitmap for index!
@@ -104,8 +103,9 @@ void GxEPD2_213_B74::_writeImage(uint8_t command, const uint8_t bitmap[], int16_
         data = bitmap[idx];
       }
       if (invert) data = ~data;
-      _writeData(data);
+      row[j] = data;
     }
+    _writeData(row, wb_win); // block transfer per row
   }
   delay(1); // yield() to avoid WDT on ESP8266 and ESP32
 }
@@ -148,9 +148,11 @@ void GxEPD2_213_B74::_writeImagePart(uint8_t command, const uint8_t bitmap[], in
   if (!_using_partial_mode) _Init_Part();
   _setPartialRamArea(x1, y1, w1, h1);
   _writeCommand(command);
+  const int16_t wb_win = w1 / 8; // bytes per window row
+  uint8_t row[256];              // stack buffer: large enough for the widest supported panel row
   for (int16_t i = 0; i < h1; i++)
   {
-    for (int16_t j = 0; j < w1 / 8; j++)
+    for (int16_t j = 0; j < wb_win; j++)
     {
       uint8_t data;
       // use wb_bitmap, h_bitmap of bitmap for index!
@@ -168,8 +170,9 @@ void GxEPD2_213_B74::_writeImagePart(uint8_t command, const uint8_t bitmap[], in
         data = bitmap[idx];
       }
       if (invert) data = ~data;
-      _writeData(data);
+      row[j] = data;
     }
+    _writeData(row, wb_win); // block transfer per row
   }
   delay(1); // yield() to avoid WDT on ESP8266 and ESP32
 }
@@ -267,6 +270,17 @@ void GxEPD2_213_B74::refresh(int16_t x, int16_t y, int16_t w, int16_t h)
   x1 -= x1 % 8;
   if (!_using_partial_mode) _Init_Part();
   _setPartialRamArea(x1, y1, w1, h1);
+  _Update_Part();
+}
+
+void GxEPD2_213_B74::refreshFast()
+{
+  // Re-trigger a fast (partial) refresh of the whole screen without writing any RAM.
+  // Controller RAM still holds the same frame, so this re-drives the panel with the
+  // fast LUT — used to repeat a refresh on an unchanged frame to clear ghosting.
+  if (_initial_refresh) return refresh(false); // initial update needs be full update
+  if (!_using_partial_mode) _Init_Part();
+  _setPartialRamArea(0, 0, WIDTH, HEIGHT);
   _Update_Part();
 }
 
