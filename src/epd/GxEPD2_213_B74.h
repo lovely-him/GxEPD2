@@ -62,7 +62,6 @@ class GxEPD2_213_B74 : public GxEPD2_EPD
     void drawNative(const uint8_t* data1, const uint8_t* data2, int16_t x, int16_t y, int16_t w, int16_t h, bool invert = false, bool mirror_y = false, bool pgm = false);
     void refresh(bool partial_update_mode = false); // screen refresh from controller memory to full screen
     void refresh(int16_t x, int16_t y, int16_t w, int16_t h); // screen refresh from controller memory, partial screen
-    void refreshFast(); // re-trigger a fast (partial) refresh of the whole screen, without writing any RAM (same-frame repeat to clear ghosting)
     void powerOff(); // turns off generation of panel driving voltages, avoids screen fading over time
     void hibernate(); // turns powerOff() and sets controller to deep sleep for minimum power use, ONLY if wakeable by RST (rst >= 0)
   private:

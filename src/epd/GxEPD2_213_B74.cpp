@@ -263,24 +263,13 @@ void GxEPD2_213_B74::refresh(int16_t x, int16_t y, int16_t w, int16_t h)
   int16_t y1 = y < 0 ? 0 : y; // limit
   w1 = x1 + w1 < int16_t(WIDTH) ? w1 : int16_t(WIDTH) - x1; // limit
   h1 = y1 + h1 < int16_t(HEIGHT) ? h1 : int16_t(HEIGHT) - y1; // limit
-  if ((w1 <= 0) || (h1 <= 0)) return; 
+  if ((w1 <= 0) || (h1 <= 0)) return;
   // make x1, w1 multiple of 8
   w1 += x1 % 8;
   if (w1 % 8 > 0) w1 += 8 - w1 % 8;
   x1 -= x1 % 8;
   if (!_using_partial_mode) _Init_Part();
   _setPartialRamArea(x1, y1, w1, h1);
-  _Update_Part();
-}
-
-void GxEPD2_213_B74::refreshFast()
-{
-  // Re-trigger a fast (partial) refresh of the whole screen without writing any RAM.
-  // Controller RAM still holds the same frame, so this re-drives the panel with the
-  // fast LUT — used to repeat a refresh on an unchanged frame to clear ghosting.
-  if (_initial_refresh) return refresh(false); // initial update needs be full update
-  if (!_using_partial_mode) _Init_Part();
-  _setPartialRamArea(0, 0, WIDTH, HEIGHT);
   _Update_Part();
 }
 
